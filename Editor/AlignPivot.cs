@@ -5,21 +5,15 @@ using UnityEngine.AI;
 
 public class AlignPivot : MonoBehaviour
 {
-	private const string GENERATED_COLLIDER_NAME = "__GeneratedCollider";
-	private const string GENERATED_NAVMESH_OBSTACLE_NAME = "__GeneratedNavMeshObstacle";
+	private const string COLLIDER_NAME = "_Collider";
+	private const string NAVMESHOBSTACLE_NAME = "_NavMeshObstacle";
     
-	private const string UNDO_ADJUST_PIVOT = "Move Pivot";
+	private const string UNDO_ALIGNPIVOT = "_AlignPivot";
 
-	private static bool createColliderObjectOnPivotChange = false;
-	private static bool createNavMeshObstacleObjectOnPivotChange = false;
+	private static bool makeColliObjPivot = false;
+	private static bool makeNaMeObsObjPivot = false;
 
-	private GUIStyle buttonStyle;
-	private GUIStyle headerStyle;
-
-	private Vector3 selectionPrevPos;
-	private Vector3 selectionPrevRot;
-	
-    [MenuItem("GameObject/Align Pivot to Center %m")]
+	[MenuItem("GameObject/Align Pivot to Center %m")]
     public static void AlignCenterPivot() => SetPivot(Selection.activeTransform,PosReturn(Selection.activeTransform,PosStand.Center));
     
     [MenuItem("GameObject/Align Pivot SomeOne/Up")]
@@ -103,12 +97,6 @@ public class AlignPivot : MonoBehaviour
         };
     }
 
-    private static void GetPrefs()
-    {
-	    createColliderObjectOnPivotChange = EditorPrefs.GetBool( "AdjustPivotCreateColliders", false );
-	    createNavMeshObstacleObjectOnPivotChange = EditorPrefs.GetBool( "AdjustPivotCreateNavMeshObstacle", false );
-    }
-    
     private static void SetPivot( Transform target,Vector3 pivotPos)
 	{
 		//meshFilter取得
@@ -120,7 +108,7 @@ public class AlignPivot : MonoBehaviour
 		if (meshFilter!=null)
 		{
 			//RecordObject が呼び出された後の変更点を記録
-			Undo.RecordObject( meshFilter, UNDO_ADJUST_PIVOT );
+			Undo.RecordObject( meshFilter, UNDO_ALIGNPIVOT );
 		    
 			//メッシュを複製
 			var meshCopy = Instantiate(originalMesh);
@@ -146,7 +134,8 @@ public class AlignPivot : MonoBehaviour
 			}
 		}
 	    
-		GetPrefs();
+		makeColliObjPivot = EditorPrefs.GetBool( "AlignPivotMakeCollis", false );
+		makeNaMeObsObjPivot = EditorPrefs.GetBool( "AlignPivotMakeNaMeObs", false );
 	    
 		//targetのみのコライダー全取得
 		var colliders = target.GetComponents<Collider>();
@@ -156,12 +145,12 @@ public class AlignPivot : MonoBehaviour
 
 			if (meshCollider != null && originalMesh != null && meshCollider.sharedMesh == originalMesh)
 			{
-				Undo.RecordObject( meshCollider, UNDO_ADJUST_PIVOT );
+				Undo.RecordObject( meshCollider, UNDO_ALIGNPIVOT );
 				meshCollider.sharedMesh = meshFilter.sharedMesh;
 			}
 		}
 
-		if( createColliderObjectOnPivotChange && target.Find( GENERATED_COLLIDER_NAME )==null )
+		if( makeColliObjPivot && target.Find( COLLIDER_NAME )==null )
 		{
 			GameObject colliderObj = null;
 			foreach( var collider in colliders )
@@ -172,7 +161,7 @@ public class AlignPivot : MonoBehaviour
 				if (meshCollider != null && meshCollider.sharedMesh == meshFilter.sharedMesh) { continue; }
 				if( colliderObj == null )
 				{
-					colliderObj = new GameObject( GENERATED_COLLIDER_NAME );
+					colliderObj = new GameObject( COLLIDER_NAME );
 					colliderObj.transform.SetParent( target, false );
 				}
 
@@ -181,56 +170,45 @@ public class AlignPivot : MonoBehaviour
 
 			if (colliderObj != null)
 			{
-				Undo.RegisterCreatedObjectUndo( colliderObj, UNDO_ADJUST_PIVOT ); 
+				Undo.RegisterCreatedObjectUndo( colliderObj, UNDO_ALIGNPIVOT ); 
 			}
 		}
 
-		if( createNavMeshObstacleObjectOnPivotChange && target.Find( GENERATED_NAVMESH_OBSTACLE_NAME )==null )
+		if( makeNaMeObsObjPivot && target.Find( NAVMESHOBSTACLE_NAME )==null )
 		{
-			var obstacle = target.GetComponent<NavMeshObstacle>();
-			if(obstacle!=null)
+			var navMeshObstacle = target.GetComponent<NavMeshObstacle>();
+			if(navMeshObstacle!=null)
 			{
-				var obstacleObj = new GameObject( GENERATED_NAVMESH_OBSTACLE_NAME );
-				obstacleObj.transform.SetParent( target, false );
-				EditorUtility.CopySerialized( obstacle, obstacleObj.AddComponent( obstacle.GetType() ) );
-				Undo.RegisterCreatedObjectUndo( obstacleObj, UNDO_ADJUST_PIVOT );
+				var navMeObsObj = new GameObject( NAVMESHOBSTACLE_NAME );
+				navMeObsObj.transform.SetParent( target, false );
+				EditorUtility.CopySerialized( navMeshObstacle, navMeObsObj.AddComponent( navMeshObstacle.GetType() ) );
+				Undo.RegisterCreatedObjectUndo( navMeObsObj, UNDO_ALIGNPIVOT );
 			}
 		}
 
 		var children = new Transform[target.childCount];
-		var childrenPositions = new Vector3[children.Length];
-		var childrenRotations = new Quaternion[children.Length];
+		var childrenPoss = new Vector3[children.Length];
+		var childrenRotes = new Quaternion[children.Length];
 		
 		for( int i = children.Length - 1; i >= 0; i-- )
 		{
 			children[i] = target.GetChild( i );
-			childrenPositions[i] = children[i].position;
-			childrenRotations[i] = children[i].rotation;
+			childrenPoss[i] = children[i].position;
+			childrenRotes[i] = children[i].rotation;
 
-			Undo.RecordObject( children[i], UNDO_ADJUST_PIVOT );
+			Undo.RecordObject( children[i], UNDO_ALIGNPIVOT );
 		}
 
-		Undo.RecordObject( target, UNDO_ADJUST_PIVOT );
+		Undo.RecordObject( target, UNDO_ALIGNPIVOT );
 		target.position = pivotPos;
 
 		for( int i = 0; i < children.Length; i++ )
 		{
-			children[i].position = childrenPositions[i];
-			children[i].rotation = childrenRotations[i];
+			children[i].position = childrenPoss[i];
+			children[i].rotation = childrenRotes[i];
 		}
 	}
     
     //どの立ち位置の座標を吐き出すか
-    private enum PosStand
-    {
-        Center,
-        Up,
-        Down,
-        Left,
-        Right,
-        Front,
-        Back,
-        Min,
-        Max
-    }
+    private enum PosStand{ Center, Up, Down, Left, Right, Front, Back, Min, Max }
 }
