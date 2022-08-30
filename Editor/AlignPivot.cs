@@ -13,7 +13,7 @@ public class AlignPivot : MonoBehaviour
 	private static bool makeColliObjPivot = false;
 	private static bool makeNaMeObsObjPivot = false;
 
-	[MenuItem("GameObject/Align Pivot to Center %m")]
+	[MenuItem("GameObject/Align Pivot to Center")]
     public static void AlignCenterPivot() => SetPivot(Selection.activeTransform,PosReturn(Selection.activeTransform,PosStand.Center));
     
     [MenuItem("GameObject/Align Pivot SomeOne/Up")]
@@ -45,7 +45,7 @@ public class AlignPivot : MonoBehaviour
         Enum.TryParse(posStand, out PosStand stand);
         return PosReturn(target, stand);
     }
-
+    
     private static Vector3 PosReturn(Transform target,PosStand posStand)
     {
         //非アクティブ含めtargetとtargetの子オブジェクト全てのrendererとcolliderを取得
@@ -98,8 +98,11 @@ public class AlignPivot : MonoBehaviour
     }
 
     private static void SetPivot( Transform target,Vector3 pivotPos)
-	{
-		//meshFilter取得
+    {
+	    //pivotPosはワールド座標でこちらはローカル座標
+	    var pivotLocalPos = target.InverseTransformPoint(pivotPos);
+
+	    //meshFilter取得
 		var meshFilter = target.GetComponent<MeshFilter>();
 		//オリジナルのメッシュ
 		var originalMesh = (meshFilter) ? meshFilter.sharedMesh : null;
@@ -118,18 +121,18 @@ public class AlignPivot : MonoBehaviour
 		    
 			//頂点の位置を取得
 			var vertices = meshCopy.vertices;
-		    
-			if( pivotPos != Vector3.zero )
+
+			if( pivotLocalPos != Vector3.zero )
 			{
 				//各頂点の位置からpivotPos座標を引く
 				for (int i = 0; i < vertices.Length; i++)
 				{
-					vertices[i] -= pivotPos;
+					vertices[i] -= pivotLocalPos;
 				}
 
 				meshCopy.vertices = vertices;
 			    
-				//頂点からメッシュのバウンディングボリュームを再計算
+				//頂点からメッシュの境界ボックスサイズを再計算
 				meshCopy.RecalculateBounds();
 			}
 		}
